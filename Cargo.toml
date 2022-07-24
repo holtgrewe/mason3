@@ -1,8 +1,22 @@
 [package]
 name = "mason"
 version = "0.1.0"
+authors = [
+    "Manuel Holtgrewe <manuel.holtgrewe@bih-charite.de>",
+]
+description = "A versatile software package for simulating NGS short-read data"
+repository = "https://github.com/holtgrewe/mason3"
+documentation = "https://docs.rs/mason3"
+readme = "README.md"
+license = "MIT"
 edition = "2021"
+include = [
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md",
+]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
+[package.metadata.release]
+pre-release-commit-message = "release version {{version}}"
+tag-message = "Version {{version}} of Mason."
