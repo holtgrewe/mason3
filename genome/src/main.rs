@@ -49,6 +49,7 @@ fn simulate_genome_to_file(term: &Term, args: &Args, file: &mut File) -> Result<
                 .template(
                     "{msg} | {wide_bar:.cyan/blue} {pos:>7}/{len:7} [{elapsed_precise}/{eta_precise}]",
                 )
+                .unwrap()
                 .progress_chars("##-"),
         );
         bar.set_message(format!("contig {}/{}", i + 1, args.contig_lengths.len()));
