@@ -194,7 +194,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mason_genome"
+name = "mason"
 version = "0.1.0"
 dependencies = [
  "anyhow",
