@@ -1,7 +1,9 @@
 /// Main entry point for mason
 mod cmd_genome;
+mod cmd_methylation;
 mod common;
 mod err;
+mod methylation;
 
 use clap::{Parser, Subcommand};
 use console::{Emoji, Term};
@@ -22,6 +24,8 @@ struct Cli {
 enum Commands {
     /// Create contigs with synthetic sequence
     Genome(cmd_genome::Args),
+    /// Simulate methylation levels
+    Methylation(cmd_methylation::Args),
 }
 
 fn main() -> Result<(), anyhow::Error> {
@@ -31,6 +35,9 @@ fn main() -> Result<(), anyhow::Error> {
     match &cli.command {
         Commands::Genome(args) => {
             cmd_genome::run(&term, &cli.common, args)?;
+        }
+        Commands::Methylation(args) => {
+            cmd_methylation::run(&term, &cli.common, args)?;
         }
     }
     term.write_line(&format!("All done. Have a nice day!{}", Emoji(" 😃", "")))?;

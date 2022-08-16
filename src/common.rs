@@ -11,3 +11,12 @@ pub struct Args {
     #[clap(short = 's', long = "seed", default_value_t = 42)]
     pub seed: u64,
 }
+
+/// Helper function to prepend lines in string
+pub fn prefix_lines(prefix: &str, text: &str) -> String {
+    let lines: Vec<String> = text
+        .lines()
+        .map(|line| format!("{}{}", prefix, line))
+        .collect();
+    lines.join("\n")
+}
