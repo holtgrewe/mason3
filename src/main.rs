@@ -1,9 +1,11 @@
 /// Main entry point for mason
+mod cmd_frag_sequencing;
 mod cmd_genome;
 mod cmd_methylation;
 mod common;
 mod err;
 mod methylation;
+mod seq;
 
 use clap::{Parser, Subcommand};
 use console::{Emoji, Term};
