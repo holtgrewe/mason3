@@ -26,6 +26,7 @@ bio = "*"
 clap = { version = "*", features=["derive"] }
 clap-verbosity-flag = "*"
 console = "*"
+enum-utils = "*"
 file_diff = "*"
 indicatif = "*"
 fastrand = "*"

@@ -1,20 +1,13 @@
-/// `mason frag_sequencing` -- simulate reads from fragments
-use fastrand::Rng;
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-};
-
+/// `mason frag-sequencing` -- simulate reads from fragments
 use clap::Args as ClapArgs;
 use console::{Emoji, Term};
-use indicatif::{ProgressBar, ProgressStyle};
 
-use crate::common::Args as CommonArgs;
 use crate::common::prefix_lines;
-use crate::seq::Args as SequencingArgs;
+use crate::common::Args as CommonArgs;
 use crate::seq::illumina::Args as IlluminaArgs;
 use crate::seq::roche454::Args as Roche454Args;
 use crate::seq::sanger::Args as SangerArgs;
+use crate::seq::Args as SequencingArgs;
 
 /// Configuration for `methylation` sub command
 #[derive(ClapArgs, Debug)]
@@ -26,8 +19,11 @@ pub struct Args {
     #[clap(short = 'o', long = "out")]
     output_filename_left: String,
     /// Output file name for right reads
-    #[clap(short = 'o', long = "out-right")]
-    output_filename_right: String,
+    #[clap(long = "out-right")]
+    output_filename_right: Option<String>,
+    /// Force single-end sequencing although `--out-right` is given
+    #[clap(long = "force-single-end", action, default_value_t = false)]
+    force_single_end: bool,
 
     /// Common sequencing simulation options
     #[clap(flatten)]
