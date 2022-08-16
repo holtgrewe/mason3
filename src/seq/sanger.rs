@@ -1,9 +1,11 @@
 /// Simulation of Sanger/capillary sequencing reads
 use clap::Args as ClapArgs;
 
+use crate::seq::Args as SeqArgs;
+use crate::seq::ReadFromFragment;
 use crate::seq::ReadLengthModel;
 
-#[derive(ClapArgs, Debug)]
+#[derive(ClapArgs, Debug, Clone)]
 pub struct Args {
     /// The model to use for read length distribution
     #[clap(id =  "sanger-read-length-model", long, value_enum, default_value_t = ReadLengthModel::Normal)]
@@ -62,4 +64,35 @@ pub struct Args {
     /// Quality standard deviation at end for errors
     #[clap(id = "sanger-quality-error-end-stddev", long, default_value_t = 5.0)]
     qual_err_end_stddev: f64,
+}
+
+/// The `ReadFromFragment` implementation for Sanger reads
+pub struct SangerFromFragment<'a> {
+    /// Generic sequencing simulation options
+    seq_args: &'a SeqArgs,
+    /// Sanger-specific simulation options
+    args: &'a Args,
+}
+
+impl<'a> SangerFromFragment<'a> {
+    pub fn new(seq_args: &'a SeqArgs, args: &'a Args) -> Self {
+        Self {
+            seq_args: seq_args,
+            args: args,
+        }
+    }
+}
+
+impl<'a> ReadFromFragment for SangerFromFragment<'a> {
+    fn simulate_read(
+        &self,
+        _seq: &mut Vec<u8>,
+        _quals: &mut Vec<u8>,
+        _info: &mut super::SeqInfo,
+        _frag: &[u8],
+        _dir: super::Direction,
+        _strand: super::Strand,
+    ) {
+        todo!()
+    }
 }

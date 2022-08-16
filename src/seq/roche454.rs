@@ -2,9 +2,11 @@
 use clap::builder::ArgAction as ClapArgAction;
 use clap::Args as ClapArgs;
 
+use crate::seq::Args as SeqArgs;
+use crate::seq::ReadFromFragment;
 use crate::seq::ReadLengthModel;
 
-#[derive(ClapArgs, Debug)]
+#[derive(ClapArgs, Debug, Clone)]
 pub struct Args {
     /// The model to use for read length distribution
     #[clap(id = "454-read-length-model", long, value_enum, default_value_t = ReadLengthModel::Uniform)]
@@ -34,4 +36,35 @@ pub struct Args {
     /// The standard deviation of the lognromal distribution for the noise
     #[clap(id = "454-background-noise-stddev", long, default_value_t = 0.15)]
     model_bg_noise_stddev: f64,
+}
+
+/// The `ReadFromFragment` implementation for Roche 454 reads
+pub struct Roche454FromFragment<'a> {
+    /// Generic sequencing simulation options
+    seq_args: &'a SeqArgs,
+    /// Roche454-specific simulation options
+    args: &'a Args,
+}
+
+impl<'a> Roche454FromFragment<'a> {
+    pub fn new(seq_args: &'a SeqArgs, args: &'a Args) -> Self {
+        Self {
+            seq_args: seq_args,
+            args: args,
+        }
+    }
+}
+
+impl<'a> ReadFromFragment for Roche454FromFragment<'a> {
+    fn simulate_read(
+        &self,
+        _seq: &mut Vec<u8>,
+        _quals: &mut Vec<u8>,
+        _info: &mut super::SeqInfo,
+        _frag: &[u8],
+        _dir: super::Direction,
+        _strand: super::Strand,
+    ) {
+        todo!()
+    }
 }

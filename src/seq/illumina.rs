@@ -1,7 +1,10 @@
 /// Simulation of Illumina short reads
 use clap::Args as ClapArgs;
 
-#[derive(ClapArgs, Debug)]
+use crate::seq::Args as SeqArgs;
+use crate::seq::ReadFromFragment;
+
+#[derive(ClapArgs, Debug, Clone)]
 pub struct Args {
     /// Length of the reads to simulate
     #[clap(id = "illumina-read-length", long, default_value_t = 100)]
@@ -79,4 +82,35 @@ pub struct Args {
         default_value_t = 15.0
     )]
     quality_mismatch_stddev_end: f64,
+}
+
+/// The `ReadFromFragment` implementation for Illumina reads
+pub struct IlluminaFromFragment<'a> {
+    /// Generic sequencing simulation options
+    seq_args: &'a SeqArgs,
+    /// Illumina-specific simulation options
+    args: &'a Args,
+}
+
+impl<'a> IlluminaFromFragment<'a> {
+    pub fn new(seq_args: &'a SeqArgs, args: &'a Args) -> Self {
+        Self {
+            seq_args: seq_args,
+            args: args,
+        }
+    }
+}
+
+impl<'a> ReadFromFragment for IlluminaFromFragment<'a> {
+    fn simulate_read(
+        &self,
+        _seq: &mut Vec<u8>,
+        _quals: &mut Vec<u8>,
+        _info: &mut super::SeqInfo,
+        _frag: &[u8],
+        _dir: super::Direction,
+        _strand: super::Strand,
+    ) {
+        todo!()
+    }
 }
