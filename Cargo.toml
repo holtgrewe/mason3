@@ -22,11 +22,16 @@ tag-message = "Version {{version}} of mason."
 
 [dependencies]
 anyhow = "*"
+bio = "*"
 clap = { version = "*", features=["derive"] }
 clap-verbosity-flag = "*"
 console = "*"
 file_diff = "*"
 indicatif = "*"
 fastrand = "*"
+statrs = "*"
 tempdir = "*"
 thiserror = "*"
+
+[dev-dependencies]
+pretty_assertions = "*"
