@@ -85,23 +85,23 @@ pub struct Args {
 }
 
 /// The `ReadFromFragment` implementation for Illumina reads
-pub struct IlluminaFromFragment<'a> {
+pub struct IlluminaFromFragment {
     /// Generic sequencing simulation options
-    seq_args: &'a SeqArgs,
+    seq_args: SeqArgs,
     /// Illumina-specific simulation options
-    args: &'a Args,
+    args: Args,
 }
 
-impl<'a> IlluminaFromFragment<'a> {
-    pub fn new(seq_args: &'a SeqArgs, args: &'a Args) -> Self {
+impl IlluminaFromFragment {
+    pub fn new(seq_args: &SeqArgs, args: &Args) -> Self {
         Self {
-            seq_args: seq_args,
-            args: args,
+            seq_args: seq_args.clone(),
+            args: args.clone(),
         }
     }
 }
 
-impl<'a> ReadFromFragment for IlluminaFromFragment<'a> {
+impl ReadFromFragment for IlluminaFromFragment {
     fn simulate_read(
         &self,
         _seq: &mut Vec<u8>,

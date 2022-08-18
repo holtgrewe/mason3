@@ -67,23 +67,23 @@ pub struct Args {
 }
 
 /// The `ReadFromFragment` implementation for Sanger reads
-pub struct SangerFromFragment<'a> {
+pub struct SangerFromFragment {
     /// Generic sequencing simulation options
-    seq_args: &'a SeqArgs,
+    seq_args: SeqArgs,
     /// Sanger-specific simulation options
-    args: &'a Args,
+    args: Args,
 }
 
-impl<'a> SangerFromFragment<'a> {
-    pub fn new(seq_args: &'a SeqArgs, args: &'a Args) -> Self {
+impl SangerFromFragment {
+    pub fn new(seq_args: &SeqArgs, args: &Args) -> Self {
         Self {
-            seq_args: seq_args,
-            args: args,
+            seq_args: seq_args.clone(),
+            args: args.clone(),
         }
     }
 }
 
-impl<'a> ReadFromFragment for SangerFromFragment<'a> {
+impl ReadFromFragment for SangerFromFragment {
     fn simulate_read(
         &self,
         _seq: &mut Vec<u8>,

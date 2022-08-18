@@ -39,23 +39,23 @@ pub struct Args {
 }
 
 /// The `ReadFromFragment` implementation for Roche 454 reads
-pub struct Roche454FromFragment<'a> {
+pub struct Roche454FromFragment {
     /// Generic sequencing simulation options
-    seq_args: &'a SeqArgs,
+    seq_args: SeqArgs,
     /// Roche454-specific simulation options
-    args: &'a Args,
+    args: Args,
 }
 
-impl<'a> Roche454FromFragment<'a> {
-    pub fn new(seq_args: &'a SeqArgs, args: &'a Args) -> Self {
+impl Roche454FromFragment {
+    pub fn new(seq_args: &SeqArgs, args: &Args) -> Self {
         Self {
-            seq_args: seq_args,
-            args: args,
+            seq_args: seq_args.clone(),
+            args: args.clone(),
         }
     }
 }
 
-impl<'a> ReadFromFragment for Roche454FromFragment<'a> {
+impl ReadFromFragment for Roche454FromFragment {
     fn simulate_read(
         &self,
         _seq: &mut Vec<u8>,
