@@ -5,7 +5,8 @@ pub mod roche454;
 pub mod sanger;
 
 use clap::Args as ClapArgs;
-use fastrand::Rng;
+use rand::{distributions::Uniform, prelude::Distribution};
+use rand_xoshiro::Xoshiro256Plus;
 
 use bs::Args as BSArgs;
 
@@ -54,7 +55,7 @@ pub enum Strand {
 }
 
 /// Constant for selecting strand with integer
-static STRANDS: &'static [Strand] = &[Strand::Forward, Strand::Reverse];
+static STRANDS: &[Strand] = &[Strand::Forward, Strand::Reverse];
 
 /// Select sequencing direction (from left or right side)
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
@@ -99,9 +100,9 @@ pub struct SeqInfo {
     pub orig_seq: Vec<u8>,
     /// The CIGAR string, `MXID` for matches, mismatches, insertions, deletions with respect to
     /// the reference
-    pub cigar: String,
-    /// Whether or not this comes from the forward strand
-    pub is_forward: bool,
+    pub cigar: CigarString,
+    /// The strand that the sequence comes from
+    pub strand: Strand,
     /// The contig ID
     pub contig_id: usize,
     /// The haplotype ID
@@ -119,8 +120,8 @@ impl SeqInfo {
     pub fn new() -> Self {
         Self {
             orig_seq: Vec::new(),
-            cigar: String::new(),
-            is_forward: false,
+            cigar: CigarString::new(),
+            strand: Strand::Forward,
             contig_id: 0,
             haplotype_id: 0,
             pos: 0,
@@ -133,7 +134,7 @@ impl SeqInfo {
     pub fn clear(&mut self) {
         self.orig_seq.clear();
         self.cigar.clear();
-        self.is_forward = false;
+        self.strand = Strand::Forward;
         self.contig_id = 0;
         self.haplotype_id = 0;
         self.pos = 0;
@@ -150,8 +151,11 @@ impl SeqInfo {
             self.haplotype_id,
             self.pos,
             String::from_utf8_lossy(&self.orig_seq),
-            &self.cigar,
-            if self.is_forward { 'F' } else { 'R' },
+            &self.cigar.to_str(),
+            match self.strand {
+                Strand::Forward => 'F',
+                Strand::Reverse => 'R',
+            },
             self.snv_count,
             self.indel_count,
         )
@@ -169,7 +173,137 @@ pub trait ReadFromFragment {
         frag: &[u8],
         dir: Direction,
         strand: Strand,
+        rng: &mut Xoshiro256Plus,
     );
+}
+
+/// Represents a CIGAR operation
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub enum CigarOp {
+    Match,
+    Ins,
+    Del,
+    // RefSkip,
+    SoftClip,
+    HardClip,
+    Pad,
+    // Equal,
+    Diff,
+}
+
+/// Represents a CIGAR element
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub struct CigarElement {
+    /// The operations
+    pub op: CigarOp,
+    /// Number of operations
+    pub count: usize,
+}
+
+impl CigarElement {
+    /// Create a new CIGAR element
+    pub fn new(op: CigarOp, count: usize) -> Self {
+        Self { op, count }
+    }
+
+    /// Convert a CIGAR element to a `String`
+    pub fn to_str(&self) -> String {
+        match self.op {
+            CigarOp::Match => format!("{}M", self.count),
+            CigarOp::Ins => format!("{}I", self.count),
+            CigarOp::Del => format!("{}D", self.count),
+            // CigarOp::RefSkip => format!("{}N", self.count),
+            CigarOp::SoftClip => format!("{}S", self.count),
+            CigarOp::HardClip => format!("{}H", self.count),
+            CigarOp::Pad => format!("{}P", self.count),
+            // CigarOp::Equal => format!("{}=", self.count),
+            CigarOp::Diff => format!("{}X", self.count),
+        }
+    }
+}
+
+/// Wrapper for a "CIGAR string"
+pub struct CigarString {
+    pub elements: Vec<CigarElement>,
+}
+
+impl CigarString {
+    /// Construct a new, empty `CigarString`
+    pub fn new() -> Self {
+        Self {
+            elements: Vec::new(),
+        }
+    }
+
+    /// Convert a CIGAR string to its `String` representation
+    pub fn to_str(&self) -> String {
+        self.elements
+            .iter()
+            .map(|x| x.to_str())
+            .collect::<Vec<String>>()
+            .join("")
+    }
+
+    /// Compute length in reference
+    pub fn len_in_ref(&self) -> usize {
+        self.elements
+            .iter()
+            .filter(|elem| {
+                elem.op != CigarOp::Ins
+                    && elem.op != CigarOp::SoftClip
+                    && elem.op != CigarOp::HardClip
+                    && elem.op != CigarOp::Pad
+            })
+            .map(|elem| elem.count)
+            .sum()
+    }
+
+    /// Clear the `CigarString`
+    pub fn clear(&mut self) {
+        self.elements.clear();
+    }
+
+    /// Append CIGAR operation to the `CigarString`.
+    ///
+    /// Returns `(a, b)` where `a` is the difference in resulting read length and `b` is the
+    /// difference in used input/reference sequence length.
+    ///
+    /// Note: the count in `e` must be `1`!
+    pub fn append(&mut self, e: CigarElement) -> (isize, isize) {
+        if e.count != 1 {
+            panic!("invalid CIGAR element {:?}", &e);
+        }
+        if let Some(last) = self.elements.last_mut() {
+            // Trailing operation and new operation cancel each other out
+            if (last.op == CigarOp::Ins && e.op == CigarOp::Del)
+                || (last.op == CigarOp::Del && e.op == CigarOp::Ins)
+            {
+                if last.count > 1 {
+                    last.count -= 1;
+                } else {
+                    self.elements.pop();
+                }
+                if e.op == CigarOp::Del {
+                    return (-1, 0);
+                } else {
+                    return (0, -1);
+                }
+            }
+        }
+
+        // No canceling out of events.  The read length increases by one if the operation is
+        // no deletion and one base of input sequence is used up if the operation is not an
+        // insertion.
+        if !self.elements.is_empty() && self.elements.last().unwrap().op == e.op {
+            self.elements.last_mut().unwrap().count += e.count;
+        } else {
+            self.elements.push(e);
+        }
+        (
+            (e.op != CigarOp::Del) as isize,
+            (e.op != CigarOp::Ins) as isize,
+        )
+    }
 }
 
 /// Generic read simulation algorithm that provides a rich interface for simulating reads given a
@@ -179,11 +313,11 @@ pub trait ReadFromFragment {
 /// initialize a buffer once required.
 pub struct ReadSimulator<'a> {
     /// Random number generation for read simulation
-    rng: &'a mut Rng,
+    rng: &'a mut Xoshiro256Plus,
     /// Random number generator for methylation level simulation
-    meth_rng: &'a mut Rng,
+    meth_rng: &'a mut Xoshiro256Plus,
     /// Overall sequencing configuration
-    seq_args: &'a Args,
+    args: &'a Args,
     /// Configuration for BS treatment
     bs_args: &'a BSArgs,
 }
@@ -192,15 +326,15 @@ pub struct ReadSimulator<'a> {
 impl<'a> ReadSimulator<'a> {
     /// Construct read simulator with methylation simulation
     pub fn new(
-        seq_args: &'a Args,
+        args: &'a Args,
         bs_args: &'a BSArgs,
-        rng: &'a mut Rng,
-        meth_rng: &'a mut Rng,
+        rng: &'a mut Xoshiro256Plus,
+        meth_rng: &'a mut Xoshiro256Plus,
     ) -> Self {
         Self {
             rng,
             meth_rng,
-            seq_args,
+            args,
             bs_args,
         }
     }
@@ -216,13 +350,14 @@ impl<'a> ReadSimulator<'a> {
         meth_frag_buffer: &mut Vec<u8>,
         read_gen: &Box<dyn ReadFromFragment>,
     ) {
-        let strand = match self.seq_args.strands {
-            Strands::Both => STRANDS[self.rng.usize(0..2)],
+        let dist = Uniform::from(0..2);
+        let strand = match self.args.strands {
+            Strands::Both => STRANDS[dist.sample(self.rng)],
             Strands::Forward => Strand::Forward,
             Strands::Reverse => Strand::Reverse,
         };
 
-        if self.bs_args.bs_sim_enabled {
+        if !self.bs_args.bs_sim_enabled {
             // Forward to PE read simulation
             self.simulate_single_end_impl(seq, quals, info, frag, read_gen, strand);
         } else {
@@ -231,7 +366,7 @@ impl<'a> ReadSimulator<'a> {
             let bs_strand = if self.bs_args.protocol == bs::Protocol::Directional {
                 strand
             } else {
-                STRANDS[self.meth_rng.usize(0..2)]
+                STRANDS[dist.sample(self.meth_rng)]
             };
             // Simulate the BS treatment of the fragment
             self.simulate_bs_treatment(
@@ -259,13 +394,14 @@ impl<'a> ReadSimulator<'a> {
         meth_frag_buffer: &mut Vec<u8>,
         read_gen: &Box<dyn ReadFromFragment>,
     ) {
-        let strand = match self.seq_args.strands {
-            Strands::Both => STRANDS[self.rng.usize(0..2)],
+        let dist = Uniform::from(0..2);
+        let strand = match self.args.strands {
+            Strands::Both => STRANDS[dist.sample(self.rng)],
             Strands::Forward => Strand::Forward,
             Strands::Reverse => Strand::Reverse,
         };
 
-        if self.bs_args.bs_sim_enabled {
+        if !self.bs_args.bs_sim_enabled {
             // Forward to PE read simulation
             self.simulate_paired_end_impl(
                 seq_l, quals_l, info_l, seq_r, quals_r, info_r, frag, read_gen, strand,
@@ -276,7 +412,7 @@ impl<'a> ReadSimulator<'a> {
             let bs_strand = if self.bs_args.protocol == bs::Protocol::Directional {
                 strand
             } else {
-                STRANDS[self.meth_rng.usize(0..2)]
+                STRANDS[dist.sample(self.meth_rng)]
             };
             // Simulate the BS treatment of the fragment
             self.simulate_bs_treatment(
@@ -302,18 +438,23 @@ impl<'a> ReadSimulator<'a> {
 
     /// Implementation of actual single-end read simulation without BS treatment
     fn simulate_single_end_impl(
-        &self,
+        &mut self,
         seq: &mut Vec<u8>,
         quals: &mut Vec<u8>,
         info: &mut SeqInfo,
-        _frag: &[u8],
-        _read_gen: &Box<dyn ReadFromFragment>,
-        _strand: Strand,
+        frag: &[u8],
+        read_gen: &Box<dyn ReadFromFragment>,
+        strand: Strand,
     ) {
-        seq.clear();
-        quals.clear();
-        info.clear();
-        todo!()
+        read_gen.simulate_read(
+            seq,
+            quals,
+            info,
+            frag,
+            Direction::Left,
+            strand,
+            &mut self.rng,
+        );
     }
 
     /// Implementation of actual paired-end read simulation without BS treatment
@@ -325,17 +466,44 @@ impl<'a> ReadSimulator<'a> {
         seq_r: &mut Vec<u8>,
         quals_r: &mut Vec<u8>,
         info_r: &mut SeqInfo,
-        _frag: &[u8],
-        _read_gen: &Box<dyn ReadFromFragment>,
-        _strand: Strand,
+        frag: &[u8],
+        read_gen: &Box<dyn ReadFromFragment>,
+        strand: Strand,
     ) {
-        seq_l.clear();
-        quals_l.clear();
-        info_l.clear();
-        seq_r.clear();
-        quals_r.clear();
-        info_r.clear();
-        todo!();
+        use Direction::*;
+        use MateOrientation::*;
+        use Strand::*;
+
+        let (direction_l, strand_l, direction_r, strand_r) =
+            match (&self.args.default_orientation, strand) {
+                (ForwardReverse, Forward) => (Left, Forward, Right, Reverse),
+                (ForwardReverse, Reverse) => (Right, Reverse, Left, Forward),
+                (ReverseForward, Forward) => (Left, Reverse, Right, Forward),
+                (ReverseForward, Reverse) => (Right, Forward, Left, Reverse),
+                (ForwardForward, Forward) => (Left, Forward, Right, Forward),
+                (ForwardForward, Reverse) => (Right, Reverse, Left, Reverse),
+                (ForwardForward2, Forward) => (Right, Forward, Left, Forward),
+                (ForwardForward2, Reverse) => (Left, Reverse, Right, Reverse),
+            };
+
+        read_gen.simulate_read(
+            seq_l,
+            quals_l,
+            info_l,
+            frag,
+            direction_l,
+            strand_l,
+            &mut self.rng,
+        );
+        read_gen.simulate_read(
+            seq_r,
+            quals_r,
+            info_r,
+            frag,
+            direction_r,
+            strand_r,
+            &mut self.rng,
+        );
     }
 
     /// Simulate BS treatment to fragment

@@ -1,5 +1,4 @@
 /// `mason genome` - simulate random sequence
-use fastrand::Rng;
 use std::{
     fs::File,
     io::{BufWriter, Write},
@@ -8,6 +7,9 @@ use std::{
 use clap::Args as ClapArgs;
 use console::{Emoji, Term};
 use indicatif::{ProgressBar, ProgressStyle};
+use rand::distributions::{Distribution, Uniform};
+use rand_xoshiro::rand_core::SeedableRng;
+use rand_xoshiro::Xoshiro256Plus;
 
 use crate::common::Args as CommonArgs;
 
@@ -36,8 +38,11 @@ fn simulate_genome_to_file(
         "{} Starting genome simulation...",
         Emoji("🛫 ", "")
     ))?;
-    let rng = Rng::with_seed(common_args.seed);
+    let mut rng = Xoshiro256Plus::seed_from_u64(common_args.seed);
     let mut writer = BufWriter::new(file);
+
+    let chars = b"ACGT";
+    let uniform = Uniform::from(0..chars.len());
 
     for (i, contig_len) in args.contig_lengths.iter().enumerate() {
         let bar = ProgressBar::new(*contig_len);
@@ -52,8 +57,6 @@ fn simulate_genome_to_file(
         bar.set_message(format!("contig {}/{}", i + 1, args.contig_lengths.len()));
         bar.set_position(0);
 
-        let chars = b"ACGT";
-
         writeln!(&mut writer, ">{}", i + 1)?;
         for i in 0..*contig_len {
             // write line breaks
@@ -61,7 +64,7 @@ fn simulate_genome_to_file(
                 writeln!(&mut writer)?;
             }
             // sample and write character
-            let c = rng.usize(0..4);
+            let c = uniform.sample(&mut rng);
             writer.write_all(&[chars[c]])?;
             // advance progress bar
             if i % 10_000 == 0 {

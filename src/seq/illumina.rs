@@ -1,5 +1,6 @@
 /// Simulation of Illumina short reads
 use clap::Args as ClapArgs;
+use rand_xoshiro::Xoshiro256Plus;
 
 use crate::seq::Args as SeqArgs;
 use crate::seq::ReadFromFragment;
@@ -84,6 +85,33 @@ pub struct Args {
     quality_mismatch_stddev_end: f64,
 }
 
+impl Args {
+    #[allow(dead_code)] // only used in tests
+    pub fn new() -> Self {
+        Self {
+            read_length: 100,
+            probability_mismatch_file: None,
+            err_prob_ins: 0.00005,
+            err_prob_del: 0.00005,
+            err_prob_mismatch_scale: 1.0,
+            err_prob_mismatch: 1.0,
+            err_prob_mismatch_begin: 0.002,
+            err_prob_mismatch_end: 0.012,
+            position_raise: 0.66,
+            template_fastq_left: None,
+            template_fastq_right: None,
+            quality_mean_begin: 40.0,
+            quality_mean_end: 39.5,
+            quality_stddev_begin: 0.005,
+            quality_stddev_end: 10.0,
+            quality_mismatch_mean_begin: 40.0,
+            quality_mismatch_mean_end: 30.0,
+            quality_mismatch_stddev_begin: 3.0,
+            quality_mismatch_stddev_end: 15.0,
+        }
+    }
+}
+
 /// The `ReadFromFragment` implementation for Illumina reads
 pub struct IlluminaFromFragment {
     /// Generic sequencing simulation options
@@ -110,6 +138,7 @@ impl ReadFromFragment for IlluminaFromFragment {
         _frag: &[u8],
         _dir: super::Direction,
         _strand: super::Strand,
+        _rng: &mut Xoshiro256Plus,
     ) {
         todo!()
     }

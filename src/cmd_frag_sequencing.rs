@@ -2,7 +2,8 @@
 use bio::io::fasta;
 use clap::Args as ClapArgs;
 use console::{Emoji, Term};
-use fastrand::Rng;
+use rand_xoshiro::rand_core::SeedableRng;
+use rand_xoshiro::Xoshiro256Plus;
 
 use crate::common::prefix_lines;
 use crate::common::Args as CommonArgs;
@@ -67,8 +68,8 @@ fn run_simulation(
         None
     };
     // Initialize random number generators
-    let mut rng = Rng::with_seed(common_args.seed);
-    let mut rng_meth = Rng::with_seed(common_args.seed);
+    let mut rng = Xoshiro256Plus::seed_from_u64(common_args.seed);
+    let mut rng_meth = Xoshiro256Plus::seed_from_u64(common_args.seed);
     // Create dummy for BS treatment simulation (deactivated)
     let dummy_bs_args = BSArgs::new();
 
@@ -111,7 +112,7 @@ fn run_simulation(
                 &mut seq_r,
                 &mut quals_r,
                 &mut info_r,
-                &frag_record.seq(),
+                frag_record.seq(),
                 None,
                 &mut meth_frag_buffer_dummy,
                 &read_gen,
@@ -141,17 +142,21 @@ fn run_simulation(
                 &mut seq_l,
                 &mut quals_l,
                 &mut info_l,
-                &frag_record.seq(),
+                frag_record.seq(),
                 None,
                 &mut meth_frag_buffer_dummy,
                 &read_gen,
             );
 
-            let desc_l = Some(format!(
-                "{} FRAG_ID={}",
-                info_l.comment_string(),
-                &frag_record.id()
-            ));
+            let desc_l = if args.sequencing.embed_read_info {
+                Some(format!(
+                    "{} FRAG_ID={}",
+                    info_l.comment_string(),
+                    &frag_record.id()
+                ))
+            } else {
+                None
+            };
 
             writer_left.write(&read_id, desc_l.as_deref(), &seq_l)?;
         }
@@ -179,4 +184,89 @@ pub fn run(term: &Term, common_args: &CommonArgs, args: &Args) -> Result<(), any
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::seq::MateOrientation;
+    use crate::seq::SequencingTechnology;
+    use crate::seq::Strands;
+
+    use clap_verbosity_flag;
+    use console::Term;
+    use file_diff::diff;
+    use tempdir::TempDir;
+
+    #[test]
+    fn test_smoke_test() {
+        let tmp_dir = TempDir::new("test").unwrap();
+        let common_args = CommonArgs {
+            verbose: clap_verbosity_flag::Verbosity::new(0, 0),
+            seed: 0,
+        };
+        let args = Args {
+            input_filename: "./tests/frag-sequencing/input-1.fa".to_string(),
+            output_filename_left: tmp_dir
+                .path()
+                .join("out.fa")
+                .into_os_string()
+                .into_string()
+                .unwrap(),
+            output_filename_right: None,
+            force_single_end: false,
+            sequencing: SequencingArgs {
+                technology: SequencingTechnology::Sanger,
+                default_orientation: MateOrientation::ForwardReverse,
+                strands: Strands::Both,
+                embed_read_info: false,
+                read_name_prefix: "simulated.".to_string(),
+            },
+            illumina: IlluminaArgs::new(),
+            roche454: Roche454Args::new(),
+            sanger: SangerArgs::new(),
+        };
+        let term = Term::stderr();
+
+        run(&term, &common_args, &args).unwrap();
+
+        assert!(!diff(
+            "./tests/frag-sequencing/expected-1-sanger.fa",
+            &args.output_filename_left
+        ));
+    }
+
+    #[test]
+    fn test_smoke_test_embed_read_info() {
+        let tmp_dir = TempDir::new("test").unwrap();
+        let common_args = CommonArgs {
+            verbose: clap_verbosity_flag::Verbosity::new(0, 0),
+            seed: 0,
+        };
+        let args = Args {
+            input_filename: "./tests/frag-sequencing/input-1.fa".to_string(),
+            output_filename_left: tmp_dir
+                .path()
+                .join("out.fa")
+                .into_os_string()
+                .into_string()
+                .unwrap(),
+            output_filename_right: None,
+            force_single_end: false,
+            sequencing: SequencingArgs {
+                technology: SequencingTechnology::Sanger,
+                default_orientation: MateOrientation::ForwardReverse,
+                strands: Strands::Both,
+                embed_read_info: true,
+                read_name_prefix: "simulated.".to_string(),
+            },
+            illumina: IlluminaArgs::new(),
+            roche454: Roche454Args::new(),
+            sanger: SangerArgs::new(),
+        };
+        let term = Term::stderr();
+
+        run(&term, &common_args, &args).unwrap();
+
+        assert!(!diff(
+            "./tests/frag-sequencing/expected-1-sanger-read-info.fa",
+            &args.output_filename_left
+        ));
+    }
 }

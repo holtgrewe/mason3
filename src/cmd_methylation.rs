@@ -2,7 +2,8 @@
 use bio::io::fasta;
 use clap::Args as ClapArgs;
 use console::{Emoji, Term};
-use fastrand::Rng;
+use rand_xoshiro::rand_core::SeedableRng;
+use rand_xoshiro::Xoshiro256Plus;
 
 use crate::common::prefix_lines;
 use crate::common::Args as CommonArgs;
@@ -34,7 +35,7 @@ fn simulate_levels(
         "{} Starting methylation level simulation...",
         Emoji("🛫 ", "")
     ))?;
-    let mut rng = Rng::with_seed(common_args.seed);
+    let mut rng = Xoshiro256Plus::seed_from_u64(common_args.seed);
     let reader = fasta::Reader::from_file(&args.input_filename)?;
     let mut writer = fasta::Writer::to_file(&args.output_filename)?;
 

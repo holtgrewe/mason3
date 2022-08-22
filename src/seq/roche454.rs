@@ -1,6 +1,7 @@
 /// Simulation of Roche 454 reads
 use clap::builder::ArgAction as ClapArgAction;
 use clap::Args as ClapArgs;
+use rand_xoshiro::Xoshiro256Plus;
 
 use crate::seq::Args as SeqArgs;
 use crate::seq::ReadFromFragment;
@@ -38,6 +39,23 @@ pub struct Args {
     model_bg_noise_stddev: f64,
 }
 
+impl Args {
+    #[allow(dead_code)] // only used in tests
+    pub fn new() -> Self {
+        Self {
+            length_model: ReadLengthModel::Uniform,
+            read_length_min: 10,
+            read_length_max: 600,
+            read_length_mean: 400.0,
+            read_length_stddev: 40.0,
+            model_sqrt_in_stddev: true,
+            model_k: 0.15,
+            model_bg_noise_mean: 0.23,
+            model_bg_noise_stddev: 0.15,
+        }
+    }
+}
+
 /// The `ReadFromFragment` implementation for Roche 454 reads
 pub struct Roche454FromFragment {
     /// Generic sequencing simulation options
@@ -64,6 +82,7 @@ impl ReadFromFragment for Roche454FromFragment {
         _frag: &[u8],
         _dir: super::Direction,
         _strand: super::Strand,
+        _rng: &mut Xoshiro256Plus,
     ) {
         todo!()
     }
