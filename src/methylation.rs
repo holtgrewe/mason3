@@ -11,8 +11,9 @@ use bio::alphabets;
 use bio::utils::TextSlice;
 use clap::Args as ClapArgs;
 use console::Emoji;
-use fastrand::Rng;
 use indicatif::{ProgressBar, ProgressStyle};
+use rand::prelude::Distribution;
+use rand_xoshiro::Xoshiro256Plus;
 use statrs::distribution::{Beta, ContinuousCDF};
 
 const M_CG: usize = 10;
@@ -125,8 +126,8 @@ fn update_slice(pos: usize, val: u8, vals: &mut [u8]) {
 }
 
 /// Compute random level character
-fn random_level_char(beta: &Beta, rng: &mut Rng) -> u8 {
-    let x = rng.f64();
+fn random_level_char(beta: &Beta, rng: &mut Xoshiro256Plus) -> u8 {
+    let x = beta.sample(rng);
     let level = beta.cdf(x);
     level_to_char(level)
 }
@@ -135,7 +136,7 @@ fn random_level_char(beta: &Beta, rng: &mut Rng) -> u8 {
 fn handle_two_mer(
     levels_top: &mut [u8],
     levels_bot: &mut [u8],
-    rng: &mut Rng,
+    rng: &mut Xoshiro256Plus,
     pos: usize,
     hash_value: usize,
     pdfs: &MethPDFs,
@@ -151,7 +152,7 @@ fn handle_two_mer(
 fn handle_three_mer(
     levels_top: &mut [u8],
     levels_bot: &mut [u8],
-    rng: &mut Rng,
+    rng: &mut Xoshiro256Plus,
     pos: usize,
     hash_value: usize,
     pdfs: &MethPDFs,
@@ -182,7 +183,7 @@ pub fn simulate_methylation_levels(
     args: &Args,
     levels_top: &mut Vec<u8>,
     levels_bot: &mut Vec<u8>,
-    rng: &mut Rng,
+    rng: &mut Xoshiro256Plus,
 ) {
     levels_top.resize(seq.len(), b'!');
     levels_bot.resize(seq.len(), b'!');
